@@ -1,6 +1,11 @@
 // ===========================
 // GLOBAL FUNCTIONS (defined first to avoid ReferenceError from inline onclick)
 // ===========================
+var carImages = {};
+var currentThumbIndex = {};
+var lightboxCar = 0;
+var lightboxIdx = 0;
+
 window.setMain = function(carIndex, thumbEl, thumbIdx) {
   currentThumbIndex[carIndex] = thumbIdx;
   var mainImg = document.getElementById('main-img-' + carIndex);
@@ -20,6 +25,41 @@ window.setMain = function(carIndex, thumbEl, thumbIdx) {
     thumbEl.classList.add('active');
   }
 };
+
+window.openLightbox = function(carIndex, startIndex) {
+  lightboxCar = carIndex;
+  lightboxIdx = (currentThumbIndex[carIndex] !== undefined) ? currentThumbIndex[carIndex] : startIndex;
+  _updateLightboxImage();
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+
+window.closeLightbox = function() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+};
+
+window.lightboxNav = function(dir) {
+  var imgs = carImages[lightboxCar];
+  if (!imgs || imgs.length === 0) return;
+  lightboxIdx = (lightboxIdx + dir + imgs.length) % imgs.length;
+  _updateLightboxImage();
+};
+
+function _updateLightboxImage() {
+  var imgs = carImages[lightboxCar];
+  if (!imgs || imgs.length === 0) return;
+  var img = document.getElementById('lightbox-img');
+  if (!img) return;
+  img.style.opacity = '0';
+  setTimeout(function() {
+    img.src = imgs[lightboxIdx];
+    img.style.transition = 'opacity 0.25s ease';
+    img.style.opacity = '1';
+  }, 120);
+  var counter = document.getElementById('lightbox-counter');
+  if (counter) counter.textContent = (lightboxIdx + 1) + ' / ' + imgs.length;
+}
 
 // ===========================
 // TRANSLATIONS
@@ -247,77 +287,43 @@ document.querySelectorAll('.brand-section').forEach(section => {
 });
 
 // ===========================
-// GALLERY — collect all images per car
+// GALLERY — build image index after DOM ready
 // ===========================
-var carImages = {};
-
 function buildCarImages() {
-  document.querySelectorAll('.car-panel').forEach(panel => {
-    const idx = parseInt(panel.dataset.car);
-    carImages[idx] = Array.from(panel.querySelectorAll('.thumb')).map(t => t.src);
+  document.querySelectorAll('.car-panel').forEach(function(panel) {
+    var idx = parseInt(panel.dataset.car);
+    carImages[idx] = Array.from(panel.querySelectorAll('.thumb')).map(function(t) { return t.src; });
   });
 }
-buildCarImages();
 
-var currentThumbIndex = {};
-
-// ===========================
-// LIGHTBOX
-// ===========================
-let lightboxCar = 0;
-let lightboxIndex = 0;
-
-window.openLightbox = function(carIndex, startIndex) {
-  lightboxCar = carIndex;
-  lightboxIndex = (currentThumbIndex[carIndex] !== undefined) ? currentThumbIndex[carIndex] : startIndex;
-  updateLightboxImage();
-  document.getElementById('lightbox').classList.add('open');
-  document.body.style.overflow = 'hidden';
-};
-
-window.closeLightbox = function() {
-  document.getElementById('lightbox').classList.remove('open');
-  document.body.style.overflow = '';
-};
-
-window.lightboxNav = function(dir) {
-  const imgs = carImages[lightboxCar];
-  if (!imgs) return;
-  lightboxIndex = (lightboxIndex + dir + imgs.length) % imgs.length;
-  updateLightboxImage();
-};
-
-function updateLightboxImage() {
-  const imgs = carImages[lightboxCar];
-  if (!imgs) return;
-  const img = document.getElementById('lightbox-img');
-  img.style.opacity = '0';
-  setTimeout(() => {
-    img.src = imgs[lightboxIndex];
-    img.style.transition = 'opacity 0.25s ease';
-    img.style.opacity = '1';
-  }, 120);
-  document.getElementById('lightbox-counter').textContent = `${lightboxIndex + 1} / ${imgs.length}`;
+// Run after DOM is fully parsed
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', buildCarImages);
+} else {
+  buildCarImages();
 }
 
 // Keyboard navigation
-document.addEventListener('keydown', e => {
-  const lb = document.getElementById('lightbox');
-  if (!lb.classList.contains('open')) return;
-  if (e.key === 'ArrowRight') lightboxNav(1);
-  if (e.key === 'ArrowLeft') lightboxNav(-1);
-  if (e.key === 'Escape') closeLightbox();
+document.addEventListener('keydown', function(e) {
+  var lb = document.getElementById('lightbox');
+  if (!lb || !lb.classList.contains('open')) return;
+  if (e.key === 'ArrowRight') window.lightboxNav(1);
+  if (e.key === 'ArrowLeft') window.lightboxNav(-1);
+  if (e.key === 'Escape') window.closeLightbox();
 });
 
 // Touch/swipe support
-let touchStartX = 0;
-document.getElementById('lightbox').addEventListener('touchstart', e => {
-  touchStartX = e.changedTouches[0].clientX;
-}, { passive: true });
-document.getElementById('lightbox').addEventListener('touchend', e => {
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  if (Math.abs(dx) > 50) lightboxNav(dx < 0 ? 1 : -1);
-});
+var touchStartX = 0;
+var lbEl = document.getElementById('lightbox');
+if (lbEl) {
+  lbEl.addEventListener('touchstart', function(e) {
+    touchStartX = e.changedTouches[0].clientX;
+  }, { passive: true });
+  lbEl.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) window.lightboxNav(dx < 0 ? 1 : -1);
+  });
+}
 
 // ===========================
 // SMOOTH SCROLL
